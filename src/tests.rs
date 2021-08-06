@@ -1,16 +1,21 @@
+use std::convert::TryInto;
+
 use crate::Board;
 use crate::Cell;
 use crate::Ring;
 
 fn ring(str: &str) -> Ring {
     Ring {
-        int: u16::from_str_radix(str, 3).unwrap(),
+        cells: str.len().try_into().expect("too many cells"),
+        int: u32::from_str_radix(str, 3).unwrap(),
     }
 }
 
 #[test]
 fn canonical() {
-    assert_eq!(ring("00000002").canonicalise(), ring("20000000"));
+    // We can't just use the `PartialEq` implementation for this, since it uses `canonicalise` internally
+    assert_eq!(ring("00000002").canonicalise().int, ring("20000000").int);
+    assert_eq!(ring("22222222").canonicalise().int, ring("22222222").int);
 }
 
 #[test]
@@ -32,11 +37,14 @@ fn shifting() {
     assert_eq!(ring("01201201") << 6, ring("01012012"));
     assert_eq!(ring("01201201") << 7, ring("10120120"));
     assert_eq!(ring("01201201") << 8, ring("01201201"));
+
+    assert_eq!((ring("00000002") << 1).int, ring("00000020").int);
 }
 
 #[test]
 fn printing() {
     assert_eq!(ring("01201201").to_string(), " XO XO X".to_string());
+    assert_eq!(ring("22222222").to_string(), "OOOOOOOO".to_string());
 }
 
 #[test]
@@ -91,4 +99,11 @@ fn winner() {
         .winner(),
         Cell::O
     );
+}
+
+#[test]
+fn reverse() {
+    assert_eq!(ring("00000002").reverse().int, ring("20000000").int);
+    assert_eq!(ring("012012012").reverse().int, ring("210210210").int);
+    assert_eq!(ring("22222222").reverse().int, ring("22222222").int);
 }
