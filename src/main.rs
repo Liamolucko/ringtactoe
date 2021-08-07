@@ -232,7 +232,7 @@ async fn main() {
                 last_mouse_angle = None;
 
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < MOVEMENT_THRESHOLD {
+                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Cell::None {
                     // We already know they were clicking the ring, since `last_mouse_angle` was `Some`.
 
                     // Undo the offset of the ring's rotation
@@ -248,13 +248,15 @@ async fn main() {
                     // Figure out which index in the ring the angle corresponds to.
                     let i = f32::round(angle / TAU * board.ring.len() as f32) as u8;
 
-                    // Set the cell.
-                    board.ring.set(i, turn);
+                    if board.ring.get(i) == Cell::None {
+                        // Set the cell.
+                        board.ring.set(i, turn);
 
-                    turn = match turn {
-                        Cell::X => Cell::O,
-                        Cell::O => Cell::X,
-                        Cell::None => unreachable!(),
+                        turn = match turn {
+                            Cell::X => Cell::O,
+                            Cell::O => Cell::X,
+                            Cell::None => unreachable!(),
+                        }
                     }
                 } else {
                     // This was a drag, so give the ring the velocity that mouse had when it let go.
@@ -277,10 +279,10 @@ async fn main() {
                 }
             } else if is_mouse_button_released(MouseButton::Left) {
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < MOVEMENT_THRESHOLD {
+                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Cell::None {
                     // If this was a click on the ring, `last_mouse_angle` would have been `Some`, so this can only have been a click in the center.
                     let dist_from_center = f32::sqrt(x.powi(2) + y.powi(2));
-                    if dist_from_center < CENTER_RADIUS {
+                    if dist_from_center < CENTER_RADIUS && board.center == Cell::None {
                         // They clicked the center.
                         board.center = turn;
 
