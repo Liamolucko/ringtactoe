@@ -9,7 +9,6 @@ use ringtactoe::Win;
 
 const RADIUS: f32 = 300.0;
 const CENTER_RADIUS: f32 = 100.0;
-const CELL_RADIUS: f32 = CENTER_RADIUS * 2.0 / 3.0;
 const LINE_THICKNESS: f32 = 4.0;
 const WIN_LINE_THICKNESS: f32 = LINE_THICKNESS * 2.0;
 const CELL_COLOR: Color = WHITE;
@@ -31,7 +30,7 @@ const RING_BG: Color = LIME;
 
 const MOVEMENT_THRESHOLD: f32 = 5.0;
 
-fn draw_cell(x: f32, y: f32, rotation: f32, cell: Cell) {
+fn draw_cell(x: f32, y: f32, rotation: f32, radius: f32, cell: Cell) {
     match cell {
         Cell::None => {}
         Cell::X => {
@@ -40,8 +39,8 @@ fn draw_cell(x: f32, y: f32, rotation: f32, cell: Cell) {
             let cos = rotation.cos();
             let sin = rotation.sin();
 
-            let off1 = CELL_RADIUS * (sin + cos) * FRAC_1_SQRT_2;
-            let off2 = CELL_RADIUS * (sin - cos) * FRAC_1_SQRT_2;
+            let off1 = radius * (sin + cos) * FRAC_1_SQRT_2;
+            let off2 = radius * (sin - cos) * FRAC_1_SQRT_2;
 
             draw_line(
                 x - off1,
@@ -62,7 +61,7 @@ fn draw_cell(x: f32, y: f32, rotation: f32, cell: Cell) {
             );
         }
         Cell::O => {
-            draw_poly_lines(x, y, 100, CELL_RADIUS, rotation, LINE_THICKNESS, CELL_COLOR);
+            draw_poly_lines(x, y, 100, radius, rotation, LINE_THICKNESS, CELL_COLOR);
         }
     }
 }
@@ -114,12 +113,17 @@ fn draw_arc(
 }
 
 fn draw_board(board: &Board, rotation: f32) {
+    let cell_radius = f32::min(
+        LINE_INNER_RADIUS * (TAU / board.ring.len() as f32 - LINE_INNER_GAP_ANGLE) / 2.0 - GAP,
+        CENTER_RADIUS * 2.0 / 3.0,
+    );
+
     let center_x = screen_width() / 2.0;
     let center_y = screen_height() / 2.0;
 
     // First, just draw the cell in the middle.
     draw_poly(center_x, center_y, 100, CENTER_RADIUS, 0.0, RING_BG);
-    draw_cell(center_x, center_y, 0.0, board.center);
+    draw_cell(center_x, center_y, 0.0, cell_radius, board.center);
 
     // Drawing the ring around the outside is a bit more complicated, since macroquad doesn't provide any way of drawing arcs or anything.
     // So instead, we just have to draw all the individual triangles ourselves.
@@ -146,6 +150,7 @@ fn draw_board(board: &Board, rotation: f32) {
             center_x + CELL_POS_RADIUS * angle.cos(),
             center_y + CELL_POS_RADIUS * angle.sin(),
             angle,
+            cell_radius,
             cell,
         );
     }
