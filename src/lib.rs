@@ -14,13 +14,13 @@ use std::ops::Shr;
 mod tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Cell {
+pub enum Glyph {
     None,
     X,
     O,
 }
 
-impl Cell {
+impl Glyph {
     fn from_digit(digit: u32) -> Self {
         match digit {
             0 => Self::None,
@@ -45,7 +45,7 @@ pub enum Win {
 }
 
 pub struct Board {
-    pub center: Cell,
+    pub center: Glyph,
     pub ring: Ring,
 }
 
@@ -53,12 +53,12 @@ impl Board {
     /// Create a new, blank board with `cells` around the outside.
     pub fn new(cells: u8) -> Self {
         Self {
-            center: Cell::None,
+            center: Glyph::None,
             ring: Ring::new(cells),
         }
     }
 
-    pub fn winner(&self) -> Cell {
+    pub fn winner(&self) -> Glyph {
         // The `.cycle().take(10)` means that we put the first two on the end as well,
         // so that we pick up matches on the wrapping-around point.
         for cells in self
@@ -69,16 +69,16 @@ impl Board {
             .collect::<Vec<_>>()
             .windows(3)
         {
-            if cells == [Cell::X; 3] {
-                return Cell::X;
-            } else if cells == [Cell::O; 3] {
-                return Cell::O;
+            if cells == [Glyph::X; 3] {
+                return Glyph::X;
+            } else if cells == [Glyph::O; 3] {
+                return Glyph::O;
             }
         }
 
-        if self.center == Cell::None {
+        if self.center == Glyph::None {
             // If the middle is blank, there can't be a win through the middle.
-            return Cell::None;
+            return Glyph::None;
         }
 
         debug_assert!(self.ring.cells % 2 == 0);
@@ -95,7 +95,7 @@ impl Board {
             }
         }
 
-        Cell::None
+        Glyph::None
     }
 
     /// Get all of the ways in which the game has been won.
@@ -113,7 +113,7 @@ impl Board {
             .windows(3)
             .enumerate()
         {
-            if cells == [Cell::X; 3] || cells == [Cell::O; 3] {
+            if cells == [Glyph::X; 3] || cells == [Glyph::O; 3] {
                 out.push(Win::Ring {
                     index: i.try_into().expect("too many cells"),
                 })
@@ -122,7 +122,7 @@ impl Board {
 
         debug_assert!(self.ring.cells % 2 == 0);
 
-        if self.center != Cell::None {
+        if self.center != Glyph::None {
             // Iterate over the pairs of cells on opposite sides of the board,
             // by offsetting the second iterator by half.
             for (i, (a, b)) in self
@@ -159,7 +159,7 @@ impl Ring {
         Self { int: 0, cells }
     }
 
-    pub fn canonicalise(self) -> Self {
+    pub fn canonicalize(self) -> Self {
         let max = (0..self.cells)
             .map(|n| self << n)
             .flat_map(|ring| [ring, ring.reverse()])
@@ -171,13 +171,13 @@ impl Ring {
         self.cells
     }
 
-    pub fn get(&self, i: u8) -> Cell {
+    pub fn get(&self, i: u8) -> Glyph {
         let i = i % self.cells;
 
-        Cell::from_digit(self.int / 3u32.pow((self.cells - i - 1).into()) % 3)
+        Glyph::from_digit(self.int / 3u32.pow((self.cells - i - 1).into()) % 3)
     }
 
-    pub fn set(&mut self, i: u8, cell: Cell) {
+    pub fn set(&mut self, i: u8, cell: Glyph) {
         let i = i % self.cells;
 
         let multiplier = 3u32.pow((self.cells - i - 1).into());
@@ -185,9 +185,9 @@ impl Ring {
         // Apply the difference between the value of the existing digit there and the new digit.
         let digit = self.int / multiplier % 3;
         let new_digit = match cell {
-            Cell::None => 0,
-            Cell::X => 1,
-            Cell::O => 2,
+            Glyph::None => 0,
+            Glyph::X => 1,
+            Glyph::O => 2,
         };
         let diff = new_digit - digit as i32;
         // Signed and unsigned addition are actually the same operation, so just pretend this is a `u32` to make the compiler let us do this.
@@ -238,13 +238,13 @@ impl Shr<u8> for Ring {
 
 impl Hash for Ring {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u32(self.canonicalise().int);
+        state.write_u32(self.canonicalize().int);
     }
 }
 
 impl PartialEq for Ring {
     fn eq(&self, other: &Self) -> bool {
-        self.canonicalise().int == other.canonicalise().int
+        self.canonicalize().int == other.canonicalize().int
     }
 }
 
@@ -260,17 +260,17 @@ impl Display for Ring {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for cell in self.into_iter() {
             f.write_char(match cell {
-                Cell::None => ' ',
-                Cell::X => 'X',
-                Cell::O => 'O',
+                Glyph::None => ' ',
+                Glyph::X => 'X',
+                Glyph::O => 'O',
             })?;
         }
         Ok(())
     }
 }
 
-impl FromIterator<Cell> for Ring {
-    fn from_iter<T: IntoIterator<Item = Cell>>(iter: T) -> Self {
+impl FromIterator<Glyph> for Ring {
+    fn from_iter<T: IntoIterator<Item = Glyph>>(iter: T) -> Self {
         let mut int = 0;
         let mut cells = 0;
         for cell in iter {
@@ -278,9 +278,9 @@ impl FromIterator<Cell> for Ring {
             int *= 3;
 
             int += match cell {
-                Cell::None => 0,
-                Cell::X => 1,
-                Cell::O => 2,
+                Glyph::None => 0,
+                Glyph::X => 1,
+                Glyph::O => 2,
             }
         }
         debug_assert!(cells <= 20);
@@ -289,7 +289,7 @@ impl FromIterator<Cell> for Ring {
 }
 
 impl IntoIterator for Ring {
-    type Item = Cell;
+    type Item = Glyph;
 
     type IntoIter = Cells;
 
@@ -308,7 +308,7 @@ pub struct Cells {
 }
 
 impl Iterator for Cells {
-    type Item = Cell;
+    type Item = Glyph;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.denom == 0 {
@@ -318,7 +318,7 @@ impl Iterator for Cells {
             self.int %= self.denom;
             self.denom /= 3;
 
-            Some(Cell::from_digit(digit))
+            Some(Glyph::from_digit(digit))
         }
     }
 
@@ -337,7 +337,7 @@ impl DoubleEndedIterator for Cells {
             self.int /= 3;
             self.denom /= 3;
 
-            Some(Cell::from_digit(digit))
+            Some(Glyph::from_digit(digit))
         }
     }
 }

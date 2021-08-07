@@ -4,36 +4,38 @@ use std::f32::consts::TAU;
 
 use macroquad::prelude::*;
 use ringtactoe::Board;
-use ringtactoe::Cell;
+use ringtactoe::Glyph;
 use ringtactoe::Win;
 
 const RADIUS: f32 = 300.0;
 const CENTER_RADIUS: f32 = 100.0;
+const GAP: f32 = 5.0;
+
 const LINE_THICKNESS: f32 = 4.0;
 const WIN_LINE_THICKNESS: f32 = LINE_THICKNESS * 2.0;
-const CELL_COLOR: Color = WHITE;
-// gap between inner circle and ring
-const GAP: f32 = 5.0;
+
 const RING_INNER_RADIUS: f32 = CENTER_RADIUS + GAP;
 const RING_THICKNESS: f32 = RADIUS - RING_INNER_RADIUS;
 
 // l = r * angle
 // angle = l / r
-const INNER_GAP_ANGLE: f32 = GAP / (CENTER_RADIUS + GAP);
+const INNER_GAP_ANGLE: f32 = GAP / RING_INNER_RADIUS;
 const OUTER_GAP_ANGLE: f32 = GAP / RADIUS;
+
 const LINE_INNER_RADIUS: f32 = RING_INNER_RADIUS + RING_THICKNESS / 2.0 - WIN_LINE_THICKNESS / 2.0;
 const LINE_OUTER_RADIUS: f32 = RING_INNER_RADIUS + RING_THICKNESS / 2.0 + WIN_LINE_THICKNESS / 2.0;
 const LINE_INNER_GAP_ANGLE: f32 = GAP / LINE_INNER_RADIUS;
 const LINE_OUTER_GAP_ANGLE: f32 = GAP / LINE_OUTER_RADIUS;
 
-const RING_BG: Color = LIME;
+const SURFACE_COLOR: Color = LIME;
+const GLYPH_COLOR: Color = WHITE;
 
 const MOVEMENT_THRESHOLD: f32 = 5.0;
 
-fn draw_cell(x: f32, y: f32, rotation: f32, radius: f32, cell: Cell) {
-    match cell {
-        Cell::None => {}
-        Cell::X => {
+fn draw_glyph(x: f32, y: f32, rotation: f32, radius: f32, glyph: Glyph) {
+    match glyph {
+        Glyph::None => {}
+        Glyph::X => {
             // The messy working out for all this nonsense is in `working.heic`.
 
             let cos = rotation.cos();
@@ -48,7 +50,7 @@ fn draw_cell(x: f32, y: f32, rotation: f32, radius: f32, cell: Cell) {
                 x + off1,
                 y + off2,
                 LINE_THICKNESS,
-                CELL_COLOR,
+                GLYPH_COLOR,
             );
 
             draw_line(
@@ -57,11 +59,11 @@ fn draw_cell(x: f32, y: f32, rotation: f32, radius: f32, cell: Cell) {
                 x - off2,
                 y + off1,
                 LINE_THICKNESS,
-                CELL_COLOR,
+                GLYPH_COLOR,
             );
         }
-        Cell::O => {
-            draw_poly_lines(x, y, 100, radius, rotation, LINE_THICKNESS, CELL_COLOR);
+        Glyph::O => {
+            draw_poly_lines(x, y, 100, radius, rotation, LINE_THICKNESS, GLYPH_COLOR);
         }
     }
 }
@@ -113,7 +115,7 @@ fn draw_arc(
 }
 
 fn draw_board(board: &Board, rotation: f32) {
-    let cell_radius = f32::min(
+    let glyph_radius = f32::min(
         LINE_INNER_RADIUS * (TAU / board.ring.len() as f32 - LINE_INNER_GAP_ANGLE) / 2.0 - GAP,
         CENTER_RADIUS * 2.0 / 3.0,
     );
@@ -121,16 +123,16 @@ fn draw_board(board: &Board, rotation: f32) {
     let center_x = screen_width() / 2.0;
     let center_y = screen_height() / 2.0;
 
-    // First, just draw the cell in the middle.
-    draw_poly(center_x, center_y, 100, CENTER_RADIUS, 0.0, RING_BG);
-    draw_cell(center_x, center_y, 0.0, cell_radius, board.center);
+    // First, just draw the middle.
+    draw_poly(center_x, center_y, 100, CENTER_RADIUS, 0.0, SURFACE_COLOR);
+    draw_glyph(center_x, center_y, 0.0, glyph_radius, board.center);
 
     // Drawing the ring around the outside is a bit more complicated, since macroquad doesn't provide any way of drawing arcs or anything.
     // So instead, we just have to draw all the individual triangles ourselves.
-    for (i, cell) in board.ring.into_iter().enumerate() {
-        let num_cells = board.ring.len() as f32;
-        let angle = rotation + i as f32 / num_cells * TAU;
-        let arc = TAU / num_cells;
+    for (i, glyph) in board.ring.into_iter().enumerate() {
+        let ring_size = board.ring.len() as f32;
+        let angle = rotation + i as f32 / ring_size * TAU;
+        let arc = TAU / ring_size;
         let inner_arc = arc - INNER_GAP_ANGLE;
         let outer_arc = arc - OUTER_GAP_ANGLE;
 
@@ -140,27 +142,24 @@ fn draw_board(board: &Board, rotation: f32) {
             outer_arc,
             CENTER_RADIUS + GAP,
             RADIUS,
-            RING_BG,
+            SURFACE_COLOR,
         );
 
-        const RADIUS_DIFF: f32 = RADIUS - (CENTER_RADIUS + GAP);
-        const CELL_POS_RADIUS: f32 = CENTER_RADIUS + GAP + (RADIUS_DIFF / 2.0);
-
-        draw_cell(
-            center_x + CELL_POS_RADIUS * angle.cos(),
-            center_y + CELL_POS_RADIUS * angle.sin(),
+        draw_glyph(
+            center_x + LINE_OUTER_RADIUS * angle.cos(),
+            center_y + LINE_OUTER_RADIUS * angle.sin(),
             angle,
-            cell_radius,
-            cell,
+            glyph_radius,
+            glyph,
         );
     }
 
     for win in board.wins() {
         match win {
             Win::Center { index } => {
-                let num_cells = board.ring.len() as f32;
+                let ring_size = board.ring.len() as f32;
 
-                let angle = rotation + index as f32 / num_cells * TAU;
+                let angle = rotation + index as f32 / ring_size * TAU;
 
                 let x_off = RADIUS * angle.cos();
                 let y_off = RADIUS * angle.sin();
@@ -175,11 +174,11 @@ fn draw_board(board: &Board, rotation: f32) {
                 );
             }
             Win::Ring { index } => {
-                let num_cells = board.ring.len() as f32;
+                let ring_size = board.ring.len() as f32;
 
-                let angle = rotation + (index + 1) as f32 / num_cells * TAU;
-                let inner_arc = TAU / num_cells * 3.0 - LINE_INNER_GAP_ANGLE;
-                let outer_arc = TAU / num_cells * 3.0 - LINE_OUTER_GAP_ANGLE;
+                let angle = rotation + (index + 1) as f32 / ring_size * TAU;
+                let inner_arc = TAU / ring_size * 3.0 - LINE_INNER_GAP_ANGLE;
+                let outer_arc = TAU / ring_size * 3.0 - LINE_OUTER_GAP_ANGLE;
 
                 draw_arc(
                     angle,
@@ -198,7 +197,7 @@ fn draw_board(board: &Board, rotation: f32) {
 async fn main() {
     let mut board = Board::new(8);
 
-    let mut turn = Cell::X;
+    let mut turn = Glyph::X;
 
     let mut rotation = 0.0;
     let mut velocity = 0.0;
@@ -232,7 +231,7 @@ async fn main() {
                 last_mouse_angle = None;
 
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Cell::None {
+                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Glyph::None {
                     // We already know they were clicking the ring, since `last_mouse_angle` was `Some`.
 
                     // Undo the offset of the ring's rotation
@@ -248,14 +247,14 @@ async fn main() {
                     // Figure out which index in the ring the angle corresponds to.
                     let i = f32::round(angle / TAU * board.ring.len() as f32) as u8;
 
-                    if board.ring.get(i) == Cell::None {
-                        // Set the cell.
+                    if board.ring.get(i) == Glyph::None {
+                        // Set the glyph.
                         board.ring.set(i, turn);
 
                         turn = match turn {
-                            Cell::X => Cell::O,
-                            Cell::O => Cell::X,
-                            Cell::None => unreachable!(),
+                            Glyph::X => Glyph::O,
+                            Glyph::O => Glyph::X,
+                            Glyph::None => unreachable!(),
                         }
                     }
                 } else {
@@ -279,17 +278,17 @@ async fn main() {
                 }
             } else if is_mouse_button_released(MouseButton::Left) {
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Cell::None {
+                if mouse_movement < MOVEMENT_THRESHOLD && board.winner() == Glyph::None {
                     // If this was a click on the ring, `last_mouse_angle` would have been `Some`, so this can only have been a click in the center.
                     let dist_from_center = f32::sqrt(x.powi(2) + y.powi(2));
-                    if dist_from_center < CENTER_RADIUS && board.center == Cell::None {
+                    if dist_from_center < CENTER_RADIUS && board.center == Glyph::None {
                         // They clicked the center.
                         board.center = turn;
 
                         turn = match turn {
-                            Cell::X => Cell::O,
-                            Cell::O => Cell::X,
-                            Cell::None => unreachable!(),
+                            Glyph::X => Glyph::O,
+                            Glyph::O => Glyph::X,
+                            Glyph::None => unreachable!(),
                         }
                     }
                 }

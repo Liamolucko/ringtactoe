@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use crate::Board;
-use crate::Cell;
+use crate::Glyph;
 use crate::Ring;
 
 fn ring(str: &str) -> Ring {
@@ -14,8 +14,8 @@ fn ring(str: &str) -> Ring {
 #[test]
 fn canonical() {
     // We can't just use the `PartialEq` implementation for this, since it uses `canonicalise` internally
-    assert_eq!(ring("00000002").canonicalise().int, ring("20000000").int);
-    assert_eq!(ring("22222222").canonicalise().int, ring("22222222").int);
+    assert_eq!(ring("00000002").canonicalize().int, ring("20000000").int);
+    assert_eq!(ring("22222222").canonicalize().int, ring("22222222").int);
 }
 
 #[test]
@@ -51,53 +51,53 @@ fn printing() {
 fn winner() {
     assert_eq!(
         Board {
-            center: Cell::None,
+            center: Glyph::None,
             ring: ring("00111020")
         }
         .winner(),
-        Cell::X
+        Glyph::X
     );
     assert_eq!(
         Board {
-            center: Cell::None,
+            center: Glyph::None,
             ring: ring("00222010")
         }
         .winner(),
-        Cell::O
+        Glyph::O
     );
 
     assert_eq!(
         Board {
-            center: Cell::None,
+            center: Glyph::None,
             ring: ring("10221211")
         }
         .winner(),
-        Cell::X
+        Glyph::X
     );
     assert_eq!(
         Board {
-            center: Cell::None,
+            center: Glyph::None,
             ring: ring("22012102")
         }
         .winner(),
-        Cell::O
+        Glyph::O
     );
 
     assert_eq!(
         Board {
-            center: Cell::X,
+            center: Glyph::X,
             ring: ring("11201202")
         }
         .winner(),
-        Cell::X
+        Glyph::X
     );
     assert_eq!(
         Board {
-            center: Cell::O,
+            center: Glyph::O,
             ring: ring("21012102")
         }
         .winner(),
-        Cell::O
+        Glyph::O
     );
 }
 
