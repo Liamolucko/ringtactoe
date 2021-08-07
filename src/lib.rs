@@ -65,7 +65,7 @@ impl Board {
             .ring
             .into_iter()
             .cycle()
-            .take(10)
+            .take((self.ring.len() + 2).into())
             .collect::<Vec<_>>()
             .windows(3)
         {
@@ -108,7 +108,7 @@ impl Board {
             .ring
             .into_iter()
             .cycle()
-            .take(10)
+            .take((self.ring.len() + 2).into())
             .collect::<Vec<_>>()
             .windows(3)
             .enumerate()
@@ -172,10 +172,14 @@ impl Ring {
     }
 
     pub fn get(&self, i: u8) -> Cell {
+        let i = i % self.cells;
+
         Cell::from_digit(self.int / 3u32.pow((self.cells - i - 1).into()) % 3)
     }
 
     pub fn set(&mut self, i: u8, cell: Cell) {
+        let i = i % self.cells;
+
         let multiplier = 3u32.pow((self.cells - i - 1).into());
 
         // Apply the difference between the value of the existing digit there and the new digit.

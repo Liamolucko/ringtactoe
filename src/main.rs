@@ -11,17 +11,25 @@ const RADIUS: f32 = 300.0;
 const CENTER_RADIUS: f32 = 100.0;
 const CELL_RADIUS: f32 = CENTER_RADIUS * 2.0 / 3.0;
 const LINE_THICKNESS: f32 = 4.0;
+const WIN_LINE_THICKNESS: f32 = LINE_THICKNESS * 2.0;
 const CELL_COLOR: Color = WHITE;
 // gap between inner circle and ring
 const GAP: f32 = 5.0;
+const RING_INNER_RADIUS: f32 = CENTER_RADIUS + GAP;
+const RING_THICKNESS: f32 = RADIUS - RING_INNER_RADIUS;
 
 // l = r * angle
 // angle = l / r
 const INNER_GAP_ANGLE: f32 = GAP / (CENTER_RADIUS + GAP);
 const OUTER_GAP_ANGLE: f32 = GAP / RADIUS;
-const MIDDLE_GAP_ANGLE: f32 = (INNER_GAP_ANGLE + OUTER_GAP_ANGLE) / 2.0;
+const LINE_INNER_RADIUS: f32 = RING_INNER_RADIUS + RING_THICKNESS / 2.0 - WIN_LINE_THICKNESS / 2.0;
+const LINE_OUTER_RADIUS: f32 = RING_INNER_RADIUS + RING_THICKNESS / 2.0 + WIN_LINE_THICKNESS / 2.0;
+const LINE_INNER_GAP_ANGLE: f32 = GAP / LINE_INNER_RADIUS;
+const LINE_OUTER_GAP_ANGLE: f32 = GAP / LINE_OUTER_RADIUS;
 
 const RING_BG: Color = LIME;
+
+const MOVEMENT_THRESHOLD: f32 = 5.0;
 
 fn draw_cell(x: f32, y: f32, rotation: f32, cell: Cell) {
     match cell {
@@ -59,6 +67,52 @@ fn draw_cell(x: f32, y: f32, rotation: f32, cell: Cell) {
     }
 }
 
+/// `angle` is the middle of the arc.
+fn draw_arc(
+    angle: f32,
+    inner_arc: f32,
+    outer_arc: f32,
+    inner_radius: f32,
+    outer_radius: f32,
+    color: Color,
+) {
+    let center_x = screen_width() / 2.0;
+    let center_y = screen_height() / 2.0;
+
+    let inner_start = angle - inner_arc / 2.0;
+    let outer_start = angle - outer_arc / 2.0;
+
+    let points: Vec<_> = (0..=50)
+        .flat_map(|i| {
+            let portion = i as f32 / 50.0;
+
+            let inner_angle = inner_start + inner_arc * portion;
+            let outer_angle = outer_start + outer_arc * portion;
+
+            [
+                vec2(
+                    center_x + outer_angle.cos() * outer_radius,
+                    center_y + outer_angle.sin() * outer_radius,
+                ),
+                vec2(
+                    center_x + inner_angle.cos() * inner_radius,
+                    center_y + inner_angle.sin() * inner_radius,
+                ),
+            ]
+        })
+        .collect();
+
+    // TODO: replace this with `array_windows` when it's stabilised.
+    for window in points.windows(3) {
+        let (a, b, c) = match window {
+            [a, b, c] => (a, b, c),
+            _ => unreachable!(),
+        };
+
+        draw_triangle(*a, *b, *c, color);
+    }
+}
+
 fn draw_board(board: &Board, rotation: f32) {
     let center_x = screen_width() / 2.0;
     let center_y = screen_height() / 2.0;
@@ -76,44 +130,22 @@ fn draw_board(board: &Board, rotation: f32) {
         let inner_arc = arc - INNER_GAP_ANGLE;
         let outer_arc = arc - OUTER_GAP_ANGLE;
 
-        let points: Vec<_> = (0..=20)
-            .flat_map(|i| {
-                let inner_angle = angle + inner_arc / 20.0 * (i as f32);
-                let outer_angle = angle + outer_arc / 20.0 * (i as f32);
-
-                [
-                    vec2(
-                        center_x + outer_angle.cos() * RADIUS,
-                        center_y + outer_angle.sin() * RADIUS,
-                    ),
-                    vec2(
-                        center_x + inner_angle.cos() * (CENTER_RADIUS + GAP),
-                        center_y + inner_angle.sin() * (CENTER_RADIUS + GAP),
-                    ),
-                ]
-            })
-            .collect();
-
-        // TODO: replace this with `array_windows` when it's stabilised.
-        for window in points.windows(3) {
-            let (a, b, c) = match window {
-                [a, b, c] => (a, b, c),
-                _ => unreachable!(),
-            };
-
-            draw_triangle(*a, *b, *c, RING_BG);
-        }
-
-        // Since we're putting the cell in the middle, take the average of the inner and outer arcs.
-        let cell_angle = angle + (inner_arc + outer_arc) / 4.0;
+        draw_arc(
+            angle,
+            inner_arc,
+            outer_arc,
+            CENTER_RADIUS + GAP,
+            RADIUS,
+            RING_BG,
+        );
 
         const RADIUS_DIFF: f32 = RADIUS - (CENTER_RADIUS + GAP);
         const CELL_POS_RADIUS: f32 = CENTER_RADIUS + GAP + (RADIUS_DIFF / 2.0);
 
         draw_cell(
-            center_x + CELL_POS_RADIUS * cell_angle.cos(),
-            center_y + CELL_POS_RADIUS * cell_angle.sin(),
-            cell_angle,
+            center_x + CELL_POS_RADIUS * angle.cos(),
+            center_y + CELL_POS_RADIUS * angle.sin(),
+            angle,
             cell,
         );
     }
@@ -124,10 +156,6 @@ fn draw_board(board: &Board, rotation: f32) {
                 let num_cells = board.ring.len() as f32;
 
                 let angle = rotation + index as f32 / num_cells * TAU;
-                let arc = TAU / num_cells - MIDDLE_GAP_ANGLE;
-
-                // Since we're putting the cell in the middle, take the average of the inner and outer arcs.
-                let angle = angle + arc / 2.0;
 
                 let x_off = RADIUS * angle.cos();
                 let y_off = RADIUS * angle.sin();
@@ -137,40 +165,25 @@ fn draw_board(board: &Board, rotation: f32) {
                     center_y - y_off,
                     center_x + x_off,
                     center_y + y_off,
-                    LINE_THICKNESS * 2.0,
+                    WIN_LINE_THICKNESS,
                     RED,
                 );
             }
             Win::Ring { index } => {
                 let num_cells = board.ring.len() as f32;
 
-                let angle = rotation + index as f32 / num_cells * TAU;
-                let arc = TAU / num_cells * 3.0 - MIDDLE_GAP_ANGLE;
+                let angle = rotation + (index + 1) as f32 / num_cells * TAU;
+                let inner_arc = TAU / num_cells * 3.0 - LINE_INNER_GAP_ANGLE;
+                let outer_arc = TAU / num_cells * 3.0 - LINE_OUTER_GAP_ANGLE;
 
-                for i in 0..100 {
-                    let start_portion = i as f32 / 100.0;
-                    let end_portion = (i + 1) as f32 / 100.0;
-
-                    let start_angle = angle + start_portion * arc;
-                    let end_angle = angle + end_portion * arc;
-
-                    const RADIUS_DIFF: f32 = RADIUS - (CENTER_RADIUS + GAP);
-                    const RING_CENTER_RADIUS: f32 = CENTER_RADIUS + GAP + (RADIUS_DIFF / 2.0);
-
-                    let start_x_off = RING_CENTER_RADIUS * start_angle.cos();
-                    let start_y_off = RING_CENTER_RADIUS * start_angle.sin();
-                    let end_x_off = RING_CENTER_RADIUS * end_angle.cos();
-                    let end_y_off = RING_CENTER_RADIUS * end_angle.sin();
-
-                    draw_line(
-                        center_x + start_x_off,
-                        center_y + start_y_off,
-                        center_x + end_x_off,
-                        center_y + end_y_off,
-                        LINE_THICKNESS * 2.0,
-                        RED,
-                    );
-                }
+                draw_arc(
+                    angle,
+                    inner_arc,
+                    outer_arc,
+                    LINE_INNER_RADIUS,
+                    LINE_OUTER_RADIUS,
+                    RED,
+                );
             }
         }
     }
@@ -214,7 +227,7 @@ async fn main() {
                 last_mouse_angle = None;
 
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < 5.0 {
+                if mouse_movement < MOVEMENT_THRESHOLD {
                     // We already know they were clicking the ring, since `last_mouse_angle` was `Some`.
 
                     // Undo the offset of the ring's rotation
@@ -228,7 +241,7 @@ async fn main() {
                     angle %= TAU;
 
                     // Figure out which index in the ring the angle corresponds to.
-                    let i = f32::floor(angle / TAU * board.ring.len() as f32) as u8;
+                    let i = f32::round(angle / TAU * board.ring.len() as f32) as u8;
 
                     // Set the cell.
                     board.ring.set(i, turn);
@@ -250,6 +263,7 @@ async fn main() {
         } else {
             if is_mouse_button_pressed(MouseButton::Left) {
                 mouse_movement = 0.0;
+                last_mouse_pos = (x, y);
 
                 let dist_from_center = f32::sqrt(x.powi(2) + y.powi(2));
                 // The click was within the ring, so mark it as grabbed.
@@ -258,7 +272,7 @@ async fn main() {
                 }
             } else if is_mouse_button_released(MouseButton::Left) {
                 // If the mouse was barely moved, we consider it a click.
-                if mouse_movement < 5.0 {
+                if mouse_movement < MOVEMENT_THRESHOLD {
                     // If this was a click on the ring, `last_mouse_angle` would have been `Some`, so this can only have been a click in the center.
                     let dist_from_center = f32::sqrt(x.powi(2) + y.powi(2));
                     if dist_from_center < CENTER_RADIUS {
